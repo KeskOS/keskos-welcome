@@ -9,6 +9,10 @@ repository = "https://github.com/memegeko/keskos"
 keywords = ["keskos", "linux", "gtk", "welcome"]
 categories = ["gui"]
 
+[[bin]]
+name = "kesk-welcome"
+path = "src/main.rs"
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 gtk = { version = "0.18", features = ["v3_24"] }

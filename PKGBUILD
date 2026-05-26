@@ -5,6 +5,7 @@ pkgdesc="KeskOS first-boot welcome app and fallback setup console"
 arch=(x86_64)
 url="https://github.com/memegeko/keskos"
 license=(GPL-3.0-or-later)
+options=(!debug)
 depends=(
   gtk3
   iputils
