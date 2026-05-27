@@ -701,11 +701,10 @@ impl WelcomeApp {
         let bottom_nav = build_bottom_nav();
         root.pack_end(&bottom_nav.frame, false, false, 0);
 
-        let network_snapshot = backend::network_snapshot();
         let state = WizardState {
             current_page: 0,
-            internet_available: network_snapshot.uplink_online,
-            network: network_snapshot,
+            internet_available: false,
+            network: backend::default_network_snapshot(),
             selected_browser: String::from("librewolf"),
             browser_install_result: String::from("skipped"),
             browser_default_result: String::from("skipped"),
@@ -737,7 +736,7 @@ impl WelcomeApp {
         });
 
         app.connect_signals();
-        app.refresh_all();
+        app.update_finish_summary();
         app.go_to_page(0);
         app
     }
@@ -944,13 +943,6 @@ impl WelcomeApp {
         }
     }
 
-    fn refresh_all(&self) {
-        self.refresh_network_page("startup");
-        self.refresh_topbar_page();
-        self.refresh_theme_page();
-        self.update_finish_summary();
-    }
-
     fn go_to_page(&self, index: usize) {
         let clamped = index.min(PAGES.len() - 1);
         self.state.borrow_mut().current_page = clamped;
@@ -962,6 +954,8 @@ impl WelcomeApp {
         if PAGES[clamped].key == "network" {
             self.logger.log("network page opened");
             self.refresh_network_page("page-open");
+        } else if PAGES[clamped].key == "topbar" {
+            self.refresh_topbar_page();
         } else if PAGES[clamped].key == "theme" {
             self.refresh_theme_page();
         } else if PAGES[clamped].key == "apps" {
@@ -1024,8 +1018,6 @@ impl WelcomeApp {
             state.network = snapshot.clone();
         }
         self.apply_network_snapshot(&snapshot);
-        self.refresh_browser_status();
-        self.refresh_optional_page();
         self.update_finish_summary();
     }
 
@@ -2257,7 +2249,7 @@ fn build_browser_page() -> (GtkBox, BrowserWidgets) {
     grid.set_column_spacing(12);
 
     let combo = ComboBoxText::new();
-    for option in backend::browser_snapshots() {
+    for option in backend::browser_options() {
         combo.append(Some(&option.key), &option.label);
     }
     combo.set_active_id(Some("librewolf"));

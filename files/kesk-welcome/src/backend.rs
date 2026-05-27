@@ -308,6 +308,31 @@ const OPTIONAL_APPS: &[CatalogItem] = &[
     },
 ];
 
+pub fn browser_options() -> &'static [BrowserOption] {
+    BROWSER_OPTIONS
+}
+
+pub fn default_network_snapshot() -> NetworkSnapshot {
+    NetworkSnapshot {
+        nmcli_available: false,
+        ping_available: false,
+        support_badge: String::from("Pending"),
+        uplink_online: false,
+        uplink_checked: false,
+        status_label: String::from("Pending"),
+        status_message: String::from("Open the Network step to run connectivity checks."),
+        backend_status: String::from("Startup checks deferred until the Network step opens."),
+        active_connection: String::from("unknown"),
+        connection_type: String::from("unknown"),
+        wired_active: false,
+        wired_status: String::from("unknown"),
+        wifi_device_detected: false,
+        wifi_status: String::from("unknown"),
+        wifi_networks: Vec::new(),
+        last_checked_timestamp: None,
+    }
+}
+
 pub fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
