@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from backend import browser_setup, pacman_backend, state, theme_apply
+from backend import branding, browser_setup, pacman_backend, state, theme_apply
 from package_presets import CATEGORY_ORDER, PRESET_CATEGORIES
 
 ACCENT = "#ce6a35"
@@ -255,6 +255,7 @@ class SetupConsole(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         state.ensure_state_dirs()
+        self.branding = branding.load_branding()
         self.logger = self._build_logger()
         self.logger.info("setup console started")
 
@@ -278,7 +279,7 @@ class SetupConsole(QMainWindow):
         self.install_command: list[str] = []
         self.process: QProcess | None = None
 
-        self.setWindowTitle("KeskOS Setup Console")
+        self.setWindowTitle(f"{self.branding.name} Setup Console")
         self.setWindowFlag(Qt.WindowCloseButtonHint, False)
         self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
         self.resize(1360, 860)
@@ -367,10 +368,13 @@ class SetupConsole(QMainWindow):
         layout.setContentsMargins(18, 20, 18, 20)
         layout.setSpacing(14)
 
-        logo = QLabel("KESKOS SETUP CONSOLE")
+        logo = QLabel(self.branding.spaced_name)
         logo.setObjectName("titleLabel")
         logo.setWordWrap(True)
-        sub = QLabel("FIRST BOOT PERSONALIZATION REQUIRED")
+        sidebar_lines = ["FIRST BOOT SEQUENCE"]
+        if self.branding.layer_name:
+            sidebar_lines.append(self.branding.layer_name)
+        sub = QLabel("\n".join(sidebar_lines))
         sub.setObjectName("subtitleLabel")
         sub.setWordWrap(True)
         layout.addWidget(logo)
@@ -426,8 +430,8 @@ class SetupConsole(QMainWindow):
         layout.setSpacing(18)
         layout.addWidget(
             self._build_page_header(
-                "KESKOS SETUP CONSOLE",
-                "KeskOS has completed installation. Before entering the desktop, choose your browser and optional system packages.",
+                f"{self.branding.brand_line} FIRST BOOT CONSOLE",
+                f"Welcome to {self.branding.brand_line}.\nThe machine greets you. Let’s finish your first boot setup.",
             )
         )
 
@@ -440,7 +444,7 @@ class SetupConsole(QMainWindow):
         labels = (
             "WELCOME // FIRST BOOT DETECTED",
             "BROWSER // SELECT ONE BASE BROWSER",
-            "THEME // APPLY LOCAL STARTPAGE + BROWSER CUSTOMIZATION",
+            f"THEME // APPLY {self.branding.name.upper()} STARTPAGE + BROWSER CUSTOMIZATION",
             "PACKAGES // OPTIONAL EXTRA SOFTWARE INSTALL",
             "COMPLETE // COMMIT STATE AND ENTER DESKTOP",
         )
@@ -464,7 +468,7 @@ class SetupConsole(QMainWindow):
         layout.addWidget(
             self._build_page_header(
                 "BROWSER SELECTION",
-                "Choose one primary browser. KeskOS will install it if available, set it as default where possible, and prepare the local startpage profile.",
+                f"Choose one primary browser. {self.branding.name} will install it if available, set it as default where possible, and prepare the local startpage profile.",
             )
         )
 
@@ -512,7 +516,7 @@ class SetupConsole(QMainWindow):
         layout.addWidget(
             self._build_page_header(
                 "BROWSER INSTALL // THEME APPLY",
-                "Install the selected browser, apply the local KeskOS startpage, and attempt browser-specific black/orange profile customization.",
+                f"Install the selected browser, apply the local {self.branding.name} startpage, and attempt browser-specific black/orange profile customization.",
             )
         )
 
@@ -1189,7 +1193,7 @@ def launch_application() -> int:
 
     os.environ.setdefault("QT_QPA_PLATFORMTHEME", "qt6ct")
     app = QApplication(sys.argv)
-    app.setApplicationName("KeskOS Setup Console")
+    app.setApplicationName(f"{branding.load_branding().name} Setup Console")
     app.setStyleSheet(APP_STYLE)
     app.setFont(QFont("JetBrains Mono Nerd Font", 10))
 

@@ -1,6 +1,6 @@
 pkgname=keskos-welcome
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="KeskOS first-boot welcome app and fallback setup console"
 arch=(x86_64)
 url="https://github.com/memegeko/keskos"
@@ -9,6 +9,7 @@ options=(!debug)
 depends=(
   gtk3
   iputils
+  keskos-release
   networkmanager
   pyside6
   python

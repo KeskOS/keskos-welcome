@@ -1,10 +1,12 @@
 mod backend;
+mod branding;
 mod logger;
 
 use backend::{
     ActionResponse, BrowserSnapshot, CatalogStatus, InstallReportRuntime, InstallSource, NetworkSnapshot,
     ThemeSnapshot,
 };
+use branding::Branding;
 use clap::Parser;
 use gtk::prelude::*;
 use gtk::{
@@ -462,7 +464,7 @@ const PAGES: [PageSpec; 8] = [
     PageSpec {
         key: "welcome",
         sidebar: "01 WELCOME",
-        title: "Welcome to KeskOS",
+        title: "Welcome",
         description: "The machine greets you. Let’s finish your first boot setup.",
     },
     PageSpec {
@@ -617,6 +619,7 @@ struct BottomNavWidgets {
 }
 
 struct WelcomeApp {
+    branding: Branding,
     cli: Cli,
     logger: Logger,
     window: ApplicationWindow,
@@ -639,14 +642,16 @@ struct WelcomeApp {
 
 impl WelcomeApp {
     fn new(application: &Application, cli: Cli) -> Rc<Self> {
+        let branding = branding::load_branding();
         let logger = Logger::new(backend::log_path());
         logger.log(&format!(
-            "app start mode={} first_run={} rerun={} marker={} legacy_marker={}",
+            "app start mode={} first_run={} rerun={} marker={} legacy_marker={} brand_line={}",
             if cli.first_run { "first-run" } else if cli.rerun { "rerun" } else { "manual" },
             cli.first_run,
             cli.rerun,
             backend::marker_path().display(),
             backend::legacy_marker_path().display(),
+            branding.brand_line,
         ));
 
         install_css(&logger);
@@ -667,20 +672,20 @@ impl WelcomeApp {
         root.set_vexpand(true);
         shell_frame.add(&root);
 
-        root.pack_start(&build_titlebar(), false, false, 0);
+        root.pack_start(&build_titlebar(&branding), false, false, 0);
 
         let body = GtkBox::new(Orientation::Horizontal, 0);
         body.set_hexpand(true);
         body.set_vexpand(true);
         root.pack_start(&body, true, true, 0);
 
-        let step_rail = build_step_rail();
+        let step_rail = build_step_rail(&branding);
         body.pack_start(&step_rail.frame, false, false, 0);
 
-        let page_host = build_page_host(&PAGES[0]);
+        let page_host = build_page_host(&PAGES[0], &branding);
         body.pack_start(&page_host.column, true, true, 0);
 
-        let welcome_page = build_welcome_page(&cli);
+        let welcome_page = build_welcome_page(&cli, &branding);
         let (network_page, network) = build_network_page();
         let (browser_page, browser) = build_browser_page();
         let (topbar_page, topbar) = build_topbar_page();
@@ -715,6 +720,7 @@ impl WelcomeApp {
         };
 
         let app = Rc::new(Self {
+            branding,
             cli,
             logger,
             window,
@@ -947,8 +953,10 @@ impl WelcomeApp {
         let clamped = index.min(PAGES.len() - 1);
         self.state.borrow_mut().current_page = clamped;
         self.stack.set_visible_child_name(PAGES[clamped].key);
-        self.title_label.set_text(&hero_title_for_page(&PAGES[clamped]));
-        self.description_label.set_text(PAGES[clamped].description);
+        self.title_label
+            .set_text(&hero_title_for_page(&PAGES[clamped], &self.branding));
+        self.description_label
+            .set_text(&page_description_for_page(&PAGES[clamped], &self.branding));
         self.update_sidebar();
         self.update_nav_buttons();
         if PAGES[clamped].key == "network" {
@@ -1938,7 +1946,7 @@ Links available: keskos.org, docs.keskos.org, github.com/memegeko/keskos, downlo
     }
 }
 
-fn build_titlebar() -> Frame {
+fn build_titlebar(branding: &Branding) -> Frame {
     let strip_frame = panel_frame("titlebar");
     strip_frame.set_size_request(-1, TITLEBAR_HEIGHT);
     strip_frame.set_hexpand(true);
@@ -1948,12 +1956,15 @@ fn build_titlebar() -> Frame {
     strip_box.set_margin_bottom(6);
     strip_box.set_margin_start(CONTENT_OUTER_MARGIN);
     strip_box.set_margin_end(CONTENT_OUTER_MARGIN);
-    strip_box.add(&label("[ KESKOS DEPLOYMENT CONSOLE ]", "strip-title"));
+    strip_box.add(&label(
+        &format!("[ {} FIRST BOOT CONSOLE ]", branding.brand_line.to_uppercase()),
+        "strip-title",
+    ));
     strip_frame.add(&strip_box);
     strip_frame
 }
 
-fn build_step_rail() -> StepRailWidgets {
+fn build_step_rail(branding: &Branding) -> StepRailWidgets {
     let frame = panel_frame("rail");
     frame.set_size_request(SIDEBAR_WIDTH, -1);
     frame.set_hexpand(false);
@@ -1971,9 +1982,11 @@ fn build_step_rail() -> StepRailWidgets {
     rail_brand.set_margin_bottom(PANEL_INSET);
     rail_brand.set_margin_start(PANEL_INSET);
     rail_brand.set_margin_end(PANEL_INSET);
-    rail_brand.add(&label("K E S K   O S", "rail-brand-title"));
+    rail_brand.add(&label(&branding.spaced_name(), "rail-brand-title"));
     rail_brand.add(&label("FIRST BOOT SEQUENCE", "rail-brand-meta"));
-    rail_brand.add(&label("S.P.L.I.T. EDITION", "rail-brand-meta"));
+    if !branding.layer_name.is_empty() {
+        rail_brand.add(&label(&branding.layer_name, "rail-brand-meta"));
+    }
     sidebar_box.pack_start(&rail_brand, false, false, 0);
     sidebar_box.pack_start(&panel_separator(), false, false, 0);
 
@@ -2000,7 +2013,7 @@ fn build_step_rail() -> StepRailWidgets {
     StepRailWidgets { frame, buttons }
 }
 
-fn build_page_host(initial_page: &PageSpec) -> PageHostWidgets {
+fn build_page_host(initial_page: &PageSpec, branding: &Branding) -> PageHostWidgets {
     let column = GtkBox::new(Orientation::Vertical, 0);
     column.set_hexpand(true);
     column.set_vexpand(true);
@@ -2020,8 +2033,8 @@ fn build_page_host(initial_page: &PageSpec) -> PageHostWidgets {
     header_box.set_margin_bottom(HERO_INSET);
     header_box.set_margin_start(HERO_INSET);
     header_box.set_margin_end(HERO_INSET);
-    let title_label = label(&hero_title_for_page(initial_page), "hero-title");
-    let description_label = label(initial_page.description, "hero-subtitle");
+    let title_label = label(&hero_title_for_page(initial_page, branding), "hero-title");
+    let description_label = label(&page_description_for_page(initial_page, branding), "hero-subtitle");
     description_label.set_line_wrap(true);
     header_box.add(&title_label);
     header_box.add(&description_label);
@@ -2097,16 +2110,19 @@ fn build_bottom_nav() -> BottomNavWidgets {
     }
 }
 
-fn build_welcome_page(cli: &Cli) -> GtkBox {
+fn build_welcome_page(cli: &Cli, branding: &Branding) -> GtkBox {
     let content = page_content_box();
     let top_row = GtkBox::new(Orientation::Horizontal, 10);
     top_row.set_homogeneous(true);
 
     let (brand_frame, brand_panel) = titled_section("DEPLOY STATUS");
-    brand_panel.add(&label("K E S K   O S", "rail-brand-title"));
-    brand_panel.add(&label("FIRST BOOT STAGE", "rail-brand-meta"));
-    brand_panel.add(&label("The machine greets you.", ""));
-    brand_panel.add(&label("Let’s finish your first boot setup and hand the system over cleanly.", "muted"));
+    brand_panel.add(&label(&branding.spaced_name(), "rail-brand-title"));
+    brand_panel.add(&label("FIRST BOOT SEQUENCE", "rail-brand-meta"));
+    if !branding.layer_name.is_empty() {
+        brand_panel.add(&label(&branding.layer_name, "rail-brand-meta"));
+    }
+    brand_panel.add(&label(&format!("Welcome to {}.", branding.brand_line), ""));
+    brand_panel.add(&label("The machine greets you. Let’s finish your first boot setup.", "muted"));
     top_row.pack_start(&brand_frame, true, true, 0);
 
     let (status_frame, status_panel) = titled_section("SYSTEM STATUS");
@@ -2128,7 +2144,10 @@ fn build_welcome_page(cli: &Cli) -> GtkBox {
 
     let (notes_frame, notes_panel) = titled_section("CONSOLE NOTES");
     let intro = label(
-        "Welcome to KeskOS.\n\nThis guided console checks uplink status, browser setup, top bar defaults, optional software, and the current desktop identity before the first session is marked complete.",
+        &format!(
+            "Welcome to {}.\n\nThe machine greets you. Let’s finish your first boot setup.\n\nThis guided console checks uplink status, browser setup, top bar defaults, optional software, and the current desktop identity before the first session is marked complete.",
+            branding.brand_line
+        ),
         "",
     );
     intro.set_line_wrap(true);
@@ -2700,9 +2719,23 @@ fn add_class<W: IsA<gtk::Widget>>(widget: &W, class_name: &str) {
     widget.style_context().add_class(class_name);
 }
 
-fn hero_title_for_page(spec: &PageSpec) -> String {
+fn page_description_for_page(spec: &PageSpec, branding: &Branding) -> String {
+    match spec.key {
+        "welcome" => String::from("The machine greets you. Let’s finish your first boot setup."),
+        "browser" => format!("Choose a default browser and apply the current {} browser setup.", branding.name),
+        "topbar" => format!("Control the current {} top bar widget layer.", branding.name),
+        "theme" => format!(
+            "Repair or reapply the current {} desktop identity without exposing fake theme options.",
+            branding.name
+        ),
+        "links" => format!("Open the official {} links and launch the current system tools.", branding.name),
+        _ => spec.description.to_string(),
+    }
+}
+
+fn hero_title_for_page(spec: &PageSpec, branding: &Branding) -> String {
     if spec.key == "welcome" {
-        String::from("KESKOS FIRST BOOT CONSOLE")
+        format!("{} FIRST BOOT CONSOLE", branding.brand_line)
     } else {
         spec.sidebar
             .split_once(' ')
